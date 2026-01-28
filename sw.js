@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stillness-v18';
+const CACHE_NAME = 'stillness-v19';
 
 const LOCAL_ASSETS = [
   './',
@@ -9,11 +9,13 @@ const LOCAL_ASSETS = [
   './styles/global.css',
   './src/app.js',
   './src/components/stillness-ring.js',
+  './src/components/stillness-onboarding.js',
   './src/services/audio-service.js',
   './src/services/haptic-service.js',
   './src/services/timer-service.js',
   './src/services/session-service.js',
   './src/services/storage-service.js',
+  './src/services/onboarding-service.js',
   './src/utils/constants.js',
   './src/utils/format.js',
   './src/utils/gesture.js',

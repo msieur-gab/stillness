@@ -5,6 +5,7 @@
 // ==============================
 
 import './components/stillness-ring.js';
+import './components/stillness-onboarding.js';
 
 import { MODES, AMBIANCES_BY_MODE, DURATIONS } from './utils/constants.js';
 import { formatTime } from './utils/format.js';
@@ -21,6 +22,7 @@ import {
 } from './services/audio-service.js';
 import { triggerHaptic } from './services/haptic-service.js';
 import { storage } from './services/storage-service.js';
+import { onboarding } from './services/onboarding-service.js';
 
 
 // ---- Services ----
@@ -435,4 +437,20 @@ setupMediaActions(
 
 // ---- Boot ----
 
-session.begin();
+function startApp() {
+  // Apply saved layout (or defaults)
+  onboarding.applyLayout();
+  session.begin();
+}
+
+if (onboarding.hasConfig()) {
+  // Layout already configured, start immediately
+  startApp();
+} else {
+  // Show onboarding to calibrate layout
+  const onboardingEl = document.createElement('stillness-onboarding');
+  onboardingEl.addEventListener('complete', () => {
+    startApp();
+  });
+  document.body.appendChild(onboardingEl);
+}
