@@ -5,6 +5,23 @@
 
 import { onboarding } from '../services/onboarding-service.js';
 
+// Ink effect tuning
+const INK = {
+  STAIN_MAX_RADIUS: 45,
+  STAIN_GROWTH_RATE: 2.5,
+  STROKE_MAX_SPREAD: 18,
+  STROKE_SPREAD_RATE: 0.35,
+  AGE_FADE_RATE: 0.012,
+  AGE_FADE_MIN: 0.3,
+};
+
+// Gesture detection thresholds
+const GESTURE = {
+  TAP_MAX_MOVEMENT: 20,
+  SWIPE_MIN_DISTANCE: 50,
+  SWIPE_RATIO: 1.5, // X movement must be this times greater than Y
+};
+
 class StillnessOnboarding extends HTMLElement {
   constructor() {
     super();
@@ -26,8 +43,8 @@ class StillnessOnboarding extends HTMLElement {
     this._touchStartY = 0;
     this._currentTrail = null;
 
-    // Debug: keep trails visible
-    this._debugMode = true;
+    // Debug: shows average position lines
+    this._showDebugLines = false;
   }
 
   connectedCallback() {
@@ -115,23 +132,48 @@ class StillnessOnboarding extends HTMLElement {
           background: var(--accent, #666);
         }
 
-        .preview-text {
+        .preview-actions {
           position: absolute;
           bottom: 3rem;
           left: 50%;
           transform: translateX(-50%);
-          text-align: center;
-          color: var(--text-muted, #888);
-          font-size: 0.65rem;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
+          display: flex;
+          gap: 1rem;
           opacity: 0;
           transition: opacity 0.5s ease;
           pointer-events: none;
         }
 
-        .preview-text.visible {
+        .preview-actions.visible {
           opacity: 1;
+          pointer-events: auto;
+        }
+
+        .preview-btn {
+          padding: 0.8rem 1.5rem;
+          border-radius: 2rem;
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .preview-btn:active {
+          transform: scale(0.95);
+        }
+
+        .preview-btn.redo {
+          background: transparent;
+          border: 1px solid var(--text-muted, #888);
+          color: var(--text-muted, #888);
+        }
+
+        .preview-btn.continue {
+          background: var(--text-primary, #333);
+          border: 1px solid var(--text-primary, #333);
+          color: var(--bg, #f5f5f5);
         }
       </style>
 
@@ -162,7 +204,10 @@ class StillnessOnboarding extends HTMLElement {
         </div>
       </div>
 
-      <div class="preview-text">Tap anywhere to continue</div>
+      <div class="preview-actions">
+        <button class="preview-btn redo">Redo</button>
+        <button class="preview-btn continue">Continue</button>
+      </div>
     `;
   }
 
@@ -193,6 +238,10 @@ class StillnessOnboarding extends HTMLElement {
     this._canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
     this._canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
     this._canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
+
+    // Preview action buttons
+    this.shadowRoot.querySelector('.preview-btn.redo').addEventListener('click', () => this._redo());
+    this.shadowRoot.querySelector('.preview-btn.continue').addEventListener('click', () => this._complete());
   }
 
   _onTouchStart(e) {
@@ -223,30 +272,7 @@ class StillnessOnboarding extends HTMLElement {
     if (!this._currentTrail) return;
 
     const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - this._touchStartX);
-    const deltaY = Math.abs(touch.clientY - this._touchStartY);
-
-    if (this._phase === 'swipe') {
-      // Detect horizontal swipe (more X movement than Y)
-      if (deltaX > 50 && deltaX > deltaY * 1.5) {
-        // Use the HIGHEST point (minimum Y) of the swipe - where finger naturally arcs
-        const minY = Math.min(...this._currentTrail.points.map(p => p.y));
-        this._registerSwipe(minY);
-      }
-    } else if (this._phase === 'tap') {
-      // Detect tap (minimal movement)
-      if (deltaX < 20 && deltaY < 20) {
-        this._registerTap(touch.clientY);
-      }
-    } else if (this._phase === 'preview') {
-      this._complete();
-    }
-
-    // Add trail to fading list
-    if (this._currentTrail.points.length > 1) {
-      this._inkTrails.push(this._currentTrail);
-    }
-    this._currentTrail = null;
+    this._handleGestureEnd(touch.clientY);
   }
 
   // Mouse fallback
@@ -275,26 +301,31 @@ class StillnessOnboarding extends HTMLElement {
     if (!this._isMouseDown) return;
     this._isMouseDown = false;
 
-    const deltaX = Math.abs(e.clientX - this._touchStartX);
-    const deltaY = Math.abs(e.clientY - this._touchStartY);
+    this._handleGestureEnd(e.clientY);
+  }
+
+  _handleGestureEnd(endY) {
+    if (!this._currentTrail) return;
+
+    const points = this._currentTrail.points;
+    const deltaX = Math.abs(points[points.length - 1].x - this._touchStartX);
+    const deltaY = Math.abs(points[points.length - 1].y - this._touchStartY);
 
     if (this._phase === 'swipe') {
-      if (deltaX > 50 && deltaX > deltaY * 1.5) {
-        // Use the HIGHEST point (minimum Y) of the swipe
-        const minY = this._currentTrail
-          ? Math.min(...this._currentTrail.points.map(p => p.y))
-          : this._touchStartY;
+      // Detect horizontal swipe
+      if (deltaX > GESTURE.SWIPE_MIN_DISTANCE && deltaX > deltaY * GESTURE.SWIPE_RATIO) {
+        const minY = Math.min(...points.map(p => p.y));
         this._registerSwipe(minY);
       }
     } else if (this._phase === 'tap') {
-      if (deltaX < 20 && deltaY < 20) {
-        this._registerTap(e.clientY);
+      // Detect tap (minimal movement)
+      if (deltaX < GESTURE.TAP_MAX_MOVEMENT && deltaY < GESTURE.TAP_MAX_MOVEMENT) {
+        this._registerTap(endY);
       }
-    } else if (this._phase === 'preview') {
-      this._complete();
     }
 
-    if (this._currentTrail && this._currentTrail.points.length > 1) {
+    // Add trail to list
+    if (points.length > 1) {
       this._inkTrails.push(this._currentTrail);
     }
     this._currentTrail = null;
@@ -353,7 +384,7 @@ class StillnessOnboarding extends HTMLElement {
 
   _updateInstruction() {
     const instruction = this.shadowRoot.querySelector('.instruction');
-    const previewText = this.shadowRoot.querySelector('.preview-text');
+    const previewActions = this.shadowRoot.querySelector('.preview-actions');
     const dots = this.shadowRoot.querySelectorAll('.dot');
 
     if (this._phase === 'swipe') {
@@ -362,13 +393,36 @@ class StillnessOnboarding extends HTMLElement {
       dots.forEach(dot => dot.classList.remove('filled'));
     } else if (this._phase === 'preview') {
       instruction.style.opacity = '0';
-      previewText.classList.add('visible');
+      previewActions.classList.add('visible');
     }
   }
 
   _showPreview() {
     // Clear old trails for clean preview
     this._inkTrails = [];
+  }
+
+  _redo() {
+    // Reset state
+    this._phase = 'tap';
+    this._swipeYs = [];
+    this._tapYs = [];
+    this._inkTrails = [];
+    this._wheelY = 0;
+    this._buttonY = 0;
+
+    // Reset UI
+    const instruction = this.shadowRoot.querySelector('.instruction');
+    const previewActions = this.shadowRoot.querySelector('.preview-actions');
+
+    instruction.querySelector('h2').textContent = 'Tap the screen';
+    instruction.querySelector('p').textContent = 'Where you want the play button';
+    instruction.style.opacity = '1';
+    previewActions.classList.remove('visible');
+    this.shadowRoot.querySelectorAll('.dot').forEach(d => d.classList.remove('filled'));
+
+    // Clear applied layout (in case it was set)
+    onboarding.clearConfig();
   }
 
   _complete() {
@@ -402,74 +456,20 @@ class StillnessOnboarding extends HTMLElement {
     const ctx = this._ctx;
     ctx.clearRect(0, 0, this._width, this._height);
 
-    // Draw ink trails (persistent in debug mode)
-    this._inkTrails = this._inkTrails.filter(trail => {
-      if (!this._debugMode) {
-        trail.opacity -= 0.008; // Slow fade
-        if (trail.opacity <= 0) return false;
-      }
-
-      if (trail.isTap) {
-        // Ink stain effect - grows then fades like ink absorbed by paper
-        const maxRadius = 45;
-        const growthRate = 2.5;
-
-        if (trail.radius < maxRadius) {
-          trail.radius += growthRate * (1 - trail.radius / maxRadius);
-        }
-
-        // Age-based fade: stain absorbs into paper over time
-        trail.age = (trail.age || 0) + 1;
-        const ageFade = Math.max(0.3, 1 - trail.age * 0.012); // Fade to 30% min
-        const fadeOpacity = trail.opacity * ageFade;
-
-        const x = trail.points[0].x;
-        const y = trail.points[0].y;
-        const r = trail.radius;
-
-        // Outer fuzzy edge
-        ctx.beginPath();
-        ctx.arc(x, y, r * 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(60, 60, 80, ${fadeOpacity * 0.2})`;
-        ctx.fill();
-
-        // Dark ring edge - gives definition to each stain
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.9, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(40, 40, 60, ${fadeOpacity * 0.25})`;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Core stain
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(50, 50, 70, ${fadeOpacity * 0.35})`;
-        ctx.fill();
-
-        // Dense center dot
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.25, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(35, 35, 55, ${fadeOpacity * 0.5})`;
-        ctx.fill();
-      } else {
-        // Draw ink trail for swipes
-        this._drawTrail(ctx, trail);
-      }
-
-      return true;
-    });
+    // Draw ink trails (persist during calibration)
+    this._inkTrails.forEach(trail => this._drawInkTrail(ctx, trail));
 
     // Draw current trail
-    if (this._currentTrail && this._currentTrail.points.length > 1) {
-      this._drawTrail(ctx, this._currentTrail);
+    if (this._currentTrail && this._currentTrail.points.length > 0) {
+      this._drawInkTrail(ctx, this._currentTrail);
     }
 
-    // Debug: draw average lines
-    if (this._debugMode) {
+    // Debug: draw average lines (optional, hide in preview)
+    if (this._showDebugLines && this._phase !== 'preview') {
       this._drawAverageLines(ctx);
     }
 
-    // Draw preview elements
+    // Draw styled preview
     if (this._phase === 'preview') {
       this._drawPreview(ctx);
     }
@@ -513,110 +513,156 @@ class StillnessOnboarding extends HTMLElement {
     }
   }
 
-  _drawTrail(ctx, trail) {
+  _drawInkTrail(ctx, trail) {
+    // Shared: age-based fade for both taps and swipes
+    trail.age = (trail.age || 0) + 1;
+    const ageFade = Math.max(INK.AGE_FADE_MIN, 1 - trail.age * INK.AGE_FADE_RATE);
+    const opacity = trail.opacity * ageFade;
+
+    if (trail.isTap) {
+      this._drawInkStain(ctx, trail, opacity);
+    } else {
+      this._drawInkStroke(ctx, trail, opacity);
+    }
+  }
+
+  _drawInkStain(ctx, trail, opacity) {
+    if (!trail.radius) trail.radius = 5;
+    if (trail.radius < INK.STAIN_MAX_RADIUS) {
+      trail.radius += INK.STAIN_GROWTH_RATE * (1 - trail.radius / INK.STAIN_MAX_RADIUS);
+    }
+
+    const { x, y } = trail.points[0];
+    const r = trail.radius;
+
+    // Outer fuzzy edge
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(60, 60, 80, ${opacity * 0.2})`;
+    ctx.fill();
+
+    // Dark ring edge - defines boundary
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.9, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(40, 40, 60, ${opacity * 0.25})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Core stain
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(50, 50, 70, ${opacity * 0.35})`;
+    ctx.fill();
+
+    // Dense center
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(35, 35, 55, ${opacity * 0.5})`;
+    ctx.fill();
+  }
+
+  _drawInkStroke(ctx, trail, opacity) {
     const points = trail.points;
     if (points.length < 2) return;
 
-    // Calculate age of trail for spreading effect
-    const age = trail.age || 0;
-    trail.age = age + 1;
-    const maxSpread = 10;
-    const spread = Math.min(age * 0.2, maxSpread);
+    // Spread effect over time - ink bleeds into paper
+    const spread = Math.min(trail.age * INK.STROKE_SPREAD_RATE, INK.STROKE_MAX_SPREAD);
 
-    // Fade slightly as ink spreads into paper
-    const spreadFade = 1 - (spread / maxSpread) * 0.35;
-    const fadeOpacity = trail.opacity * spreadFade;
-
-    // Draw the path function (reusable)
     const drawPath = () => {
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
-
       for (let i = 1; i < points.length - 1; i++) {
         const xc = (points[i].x + points[i + 1].x) / 2;
         const yc = (points[i].y + points[i + 1].y) / 2;
         ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
       }
-
-      const last = points[points.length - 1];
-      ctx.lineTo(last.x, last.y);
+      ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
     };
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Layer 1: Outer glow (spreading edge)
+    // Layer 1: Outer glow
     drawPath();
-    ctx.strokeStyle = `rgba(60, 60, 80, ${fadeOpacity * 0.18})`;
-    ctx.lineWidth = 16 + spread * 1.5;
+    ctx.strokeStyle = `rgba(60, 60, 80, ${opacity * 0.18})`;
+    ctx.lineWidth = 16 + spread * 2;
     ctx.stroke();
 
     // Layer 2: Mid spread
     drawPath();
-    ctx.strokeStyle = `rgba(55, 55, 75, ${fadeOpacity * 0.3})`;
-    ctx.lineWidth = 8 + spread * 0.8;
+    ctx.strokeStyle = `rgba(55, 55, 75, ${opacity * 0.3})`;
+    ctx.lineWidth = 8 + spread * 1.2;
     ctx.stroke();
 
-    // Layer 3: Core ink line
+    // Layer 3: Core line
     drawPath();
-    ctx.strokeStyle = `rgba(45, 45, 65, ${fadeOpacity * 0.5})`;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(45, 45, 65, ${opacity * 0.5})`;
+    ctx.lineWidth = 4 + spread * 0.4;
     ctx.stroke();
 
     // Layer 4: Dense center
     drawPath();
-    ctx.strokeStyle = `rgba(35, 35, 55, ${trail.opacity * 0.6})`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(35, 35, 55, ${opacity * 0.6})`;
+    ctx.lineWidth = 2 + spread * 0.2;
     ctx.stroke();
 
-    // Draw ink blob at start point (spreading origin)
-    const startBlob = 8 + spread;
+    // Start blob
+    const blobR = 8 + spread * 1.2;
     ctx.beginPath();
-    ctx.arc(points[0].x, points[0].y, startBlob, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(50, 50, 70, ${fadeOpacity * 0.4})`;
-    ctx.fill();
-
-    // Dense center of blob
-    ctx.beginPath();
-    ctx.arc(points[0].x, points[0].y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(35, 35, 55, ${trail.opacity * 0.7})`;
+    ctx.arc(points[0].x, points[0].y, blobR, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(50, 50, 70, ${opacity * 0.4})`;
     ctx.fill();
   }
 
   _drawPreview(ctx) {
-    // wheelY is where the user swiped - where the visible arc should appear
     const wheelYPx = (this._wheelY / 100) * this._height;
     const buttonYPx = (this._buttonY / 100) * this._height;
+    const centerX = this._width / 2;
 
-    // The actual wheel has radius = 50vh, center is below the visible arc
-    // For preview, we use viewport height as reference
+    // Wheel: radius = 50vh, center below visible arc
     const wheelRadius = this._height * 0.5;
-    const wheelCenterY = wheelYPx + wheelRadius; // Center is below the arc
+    const wheelCenterY = wheelYPx + wheelRadius;
 
-    // Draw wheel arc preview (only the visible top portion)
+    // Track (thin, like real ring)
     ctx.beginPath();
-    ctx.arc(this._width / 2, wheelCenterY, wheelRadius,
-            Math.PI * 1.2, Math.PI * 1.8); // ~108° to ~324° - top arc
-    ctx.strokeStyle = 'rgba(100, 100, 100, 0.25)';
-    ctx.lineWidth = 35;
+    ctx.arc(centerX, wheelCenterY, wheelRadius, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.strokeStyle = 'rgba(180, 180, 180, 0.4)';
+    ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Draw button preview
+    // Option markers on track
+    const optionCount = 5;
+    for (let i = 0; i < optionCount; i++) {
+      const angle = Math.PI * 1.15 + (Math.PI * 0.7 / (optionCount - 1)) * i;
+      const x = centerX + Math.cos(angle) * wheelRadius;
+      const y = wheelCenterY + Math.sin(angle) * wheelRadius;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = i === 2 ? 'rgba(100, 100, 100, 0.6)' : 'rgba(150, 150, 150, 0.3)';
+      ctx.fill();
+    }
+
+    // Button (80px like real, with border)
+    const btnRadius = 40;
     ctx.beginPath();
-    ctx.arc(this._width / 2, buttonYPx, 40, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(100, 100, 100, 0.15)';
+    ctx.arc(centerX, buttonYPx, btnRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(245, 245, 245, 0.9)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(180, 180, 180, 0.6)';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
     // Button label
-    ctx.fillStyle = 'rgba(100, 100, 100, 0.4)';
-    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(120, 120, 120, 0.8)';
+    ctx.font = '600 9px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('PLAY', this._width / 2, buttonYPx + 4);
+    ctx.textBaseline = 'middle';
+    ctx.letterSpacing = '0.1em';
+    ctx.fillText('SELECT', centerX, buttonYPx);
   }
+
 }
 
 customElements.define('stillness-onboarding', StillnessOnboarding);
