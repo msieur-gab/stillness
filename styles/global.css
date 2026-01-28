@@ -23,9 +23,10 @@ body {
 
 .wheel-container {
   position: fixed;
-  /* Adaptive positioning: --wheel-y is % from top where user wants the arc
-     Formula: bottom = wheelY - 100vh (so arc appears at wheelY from top) */
-  bottom: calc(var(--wheel-y, 78vh) - 100vh);
+  /* Adaptive positioning: --wheel-y is where user wants the track (outer edge)
+     Ring center = container bottom (due to translateY(50%))
+     Track = center - 50vh, so: bottom = 50vh - wheelY */
+  bottom: calc(50vh - var(--wheel-y, 72vh));
   left: 50%;
   transform: translateX(-50%);
   width: 200vw;

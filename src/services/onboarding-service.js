@@ -7,7 +7,7 @@ const STORAGE_KEY = 'stillness-layout';
 
 // Default positions (percentage of viewport height)
 const DEFAULTS = {
-  wheelY: 78,   // 78% from top (bottom area)
+  wheelY: 72,   // 72% from top - where the track/outer edge appears
   buttonY: 92,  // 92% from top (very bottom)
 };
 
