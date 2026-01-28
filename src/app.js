@@ -320,7 +320,35 @@ if (storage.isDark) {
 // ---- Service Worker ----
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js');
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available! 
+            showUpdatePrompt();
+          }
+        });
+      });
+    });
+  });
+}
+
+function showUpdatePrompt() {
+  const msg = 'A new version is available.';
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    background: var(--text-primary); color: var(--bg);
+    padding: 0.8rem 1.2rem; border-radius: 2rem; font-size: 0.7rem;
+    z-index: 1000; display: flex; align-items: center; gap: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  `;
+  toast.innerHTML = `<span>${msg}</span><button style="background:none; border:1px solid var(--bg); color:var(--bg); border-radius:1rem; padding:0.2rem 0.6rem; cursor:pointer; font-size:0.6rem;">Update</button>`;
+  
+  toast.querySelector('button').onclick = () => window.location.reload();
+  document.body.appendChild(toast);
 }
 
 // ---- Media Session Actions ----
