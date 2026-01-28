@@ -134,7 +134,7 @@ class StillnessOnboarding extends HTMLElement {
 
         .preview-actions {
           position: absolute;
-          bottom: 3rem;
+          top: 35%;
           left: 50%;
           transform: translateX(-50%);
           display: flex;
@@ -644,23 +644,11 @@ class StillnessOnboarding extends HTMLElement {
       ctx.fill();
     }
 
-    // Button (80px like real, with border)
-    const btnRadius = 40;
+    // Button (80px filled circle, same subtle style as arc)
     ctx.beginPath();
-    ctx.arc(centerX, buttonYPx, btnRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(245, 245, 245, 0.9)';
+    ctx.arc(centerX, buttonYPx, 40, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(180, 180, 180, 0.4)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(180, 180, 180, 0.6)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Button label
-    ctx.fillStyle = 'rgba(120, 120, 120, 0.8)';
-    ctx.font = '600 9px -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.letterSpacing = '0.1em';
-    ctx.fillText('SELECT', centerX, buttonYPx);
   }
 
 }
