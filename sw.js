@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stillness-v19';
+const CACHE_NAME = 'stillness-v20';
 
 const LOCAL_ASSETS = [
   './',
