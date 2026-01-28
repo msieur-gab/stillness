@@ -1,17 +1,22 @@
 // ==============================
-// Audio Service
-// Uses HTML Audio for ambiance (enables Media Session on Android)
-// Web Audio API for tick feedback only
+// Audio Service — Hybrid Approach
+// Web Audio API for gapless ambiance looping
+// Silent HTML Audio to trigger Media Session (Android/iOS)
 // ==============================
 
 let ctx = null;
-let ambianceAudio = null;
+let gainNode = null;
+let sourceNode = null;
+let ambianceBuffer = null;
+let mediaAudio = null;  // Silent audio for Media Session
 let chimeAudio = null;
 let fadeInterval = null;
 
 function ensureContext() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = ctx.createGain();
+    gainNode.connect(ctx.destination);
   }
   return ctx;
 }
@@ -23,7 +28,7 @@ export function updateMediaMetadata(modeLabel, ambianceLabel) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: `${modeLabel} Meditation`,
       artist: 'Stillness',
-      album: ambianceLabel || 'Silence',
+      album: ambianceLabel || 'Ambient',
       artwork: [
         { src: './yoga_15876064.png', sizes: '512x512', type: 'image/png' }
       ]
@@ -42,6 +47,43 @@ export function setupMediaActions(onPlay, onPause) {
 export function setMediaPlaybackState(state) {
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = state; // 'playing', 'paused', 'none'
+  }
+}
+
+// ---- Silent Audio for Media Session ----
+// This tricks Android/iOS into showing lock screen controls
+
+function startMediaSessionAudio(url) {
+  if (mediaAudio) {
+    mediaAudio.pause();
+    mediaAudio = null;
+  }
+
+  // Use the actual audio file but at near-zero volume
+  // This triggers Media Session while Web Audio does the real playback
+  mediaAudio = new Audio(url);
+  mediaAudio.loop = true;
+  mediaAudio.volume = 0.01; // Nearly silent
+  mediaAudio.play().catch(() => {});
+}
+
+function stopMediaSessionAudio() {
+  if (mediaAudio) {
+    mediaAudio.pause();
+    mediaAudio.currentTime = 0;
+    mediaAudio = null;
+  }
+}
+
+function pauseMediaSessionAudio() {
+  if (mediaAudio) {
+    mediaAudio.pause();
+  }
+}
+
+function resumeMediaSessionAudio() {
+  if (mediaAudio) {
+    mediaAudio.play().catch(() => {});
   }
 }
 
@@ -67,26 +109,49 @@ export function playTick() {
   osc.stop(ctx.currentTime + 0.05);
 }
 
-// ---- Ambiance (HTML Audio for Media Session support) ----
+// ---- Ambiance (Web Audio for gapless looping) ----
+
+let currentAmbianceUrl = null;
 
 export async function loadAmbiance(url) {
-  stopAmbiance();
-  ambianceAudio = new Audio(url);
-  ambianceAudio.loop = true;
-  ambianceAudio.preload = 'auto';
-  ambianceAudio.volume = 1;
+  const c = ensureContext();
+  if (c.state === 'suspended') await c.resume();
 
-  return new Promise((resolve, reject) => {
-    ambianceAudio.addEventListener('canplaythrough', resolve, { once: true });
-    ambianceAudio.addEventListener('error', reject, { once: true });
-    ambianceAudio.load();
-  });
+  currentAmbianceUrl = url;
+
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  ambianceBuffer = await c.decodeAudioData(arrayBuffer);
 }
 
 export function startAmbiance() {
-  if (!ambianceAudio) return;
-  ambianceAudio.volume = 1;
-  ambianceAudio.play().catch(() => {});
+  if (!ambianceBuffer || !ctx) return;
+
+  // Stop any existing playback
+  stopAmbianceSource();
+
+  // Reset gain
+  gainNode.gain.setValueAtTime(1, ctx.currentTime);
+
+  // Create and start new source
+  sourceNode = ctx.createBufferSource();
+  sourceNode.buffer = ambianceBuffer;
+  sourceNode.loop = true;
+  sourceNode.connect(gainNode);
+  sourceNode.start(0);
+
+  // Start silent audio for Media Session
+  if (currentAmbianceUrl) {
+    startMediaSessionAudio(currentAmbianceUrl);
+  }
+}
+
+function stopAmbianceSource() {
+  if (sourceNode) {
+    try { sourceNode.stop(); } catch (_) {}
+    sourceNode.disconnect();
+    sourceNode = null;
+  }
 }
 
 export function stopAmbiance() {
@@ -94,54 +159,57 @@ export function stopAmbiance() {
     clearInterval(fadeInterval);
     fadeInterval = null;
   }
-  if (ambianceAudio) {
-    ambianceAudio.pause();
-    ambianceAudio.currentTime = 0;
-    ambianceAudio = null;
-  }
+
+  stopAmbianceSource();
+  stopMediaSessionAudio();
+  ambianceBuffer = null;
+  currentAmbianceUrl = null;
+
   setMediaPlaybackState('none');
 }
 
 // ---- Pause / Resume ----
 
 export async function suspendAudio() {
-  if (ambianceAudio) {
-    ambianceAudio.pause();
-  }
   if (ctx && ctx.state === 'running') await ctx.suspend();
+  pauseMediaSessionAudio();
   setMediaPlaybackState('paused');
 }
 
 export async function resumeAudio() {
   if (ctx && ctx.state === 'suspended') await ctx.resume();
-  if (ambianceAudio) {
-    ambianceAudio.play().catch(() => {});
-  }
+  resumeMediaSessionAudio();
   setMediaPlaybackState('playing');
 }
 
 // ---- Fade (Sleeping mode ending) ----
 
 export function fadeAmbiance(durationSeconds) {
-  if (!ambianceAudio) return;
+  if (!ctx || !gainNode) return;
 
-  const startVolume = ambianceAudio.volume;
-  const steps = durationSeconds * 10; // 10 steps per second
-  const volumeStep = startVolume / steps;
-  let currentStep = 0;
+  // Use Web Audio's smooth ramping for the main audio
+  gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + durationSeconds);
 
-  if (fadeInterval) clearInterval(fadeInterval);
+  // Also fade the Media Session audio
+  if (mediaAudio) {
+    const startVolume = mediaAudio.volume;
+    const steps = durationSeconds * 10;
+    const volumeStep = startVolume / steps;
+    let currentStep = 0;
 
-  fadeInterval = setInterval(() => {
-    currentStep++;
-    const newVolume = Math.max(0, startVolume - (volumeStep * currentStep));
-    ambianceAudio.volume = newVolume;
+    if (fadeInterval) clearInterval(fadeInterval);
 
-    if (currentStep >= steps) {
-      clearInterval(fadeInterval);
-      fadeInterval = null;
-    }
-  }, 100);
+    fadeInterval = setInterval(() => {
+      currentStep++;
+      mediaAudio.volume = Math.max(0, startVolume - (volumeStep * currentStep));
+
+      if (currentStep >= steps) {
+        clearInterval(fadeInterval);
+        fadeInterval = null;
+      }
+    }, 100);
+  }
 }
 
 // ---- Chime (Focusing & Meditating mode ending) ----
