@@ -1,0 +1,15 @@
+# Documentation and local settings
+_docs/
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies (if any added later)
+node_modules/
+dist/
+
+# Local env files
+.env
+.env.local
