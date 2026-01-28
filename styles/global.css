@@ -1,0 +1,224 @@
+/* ==============================
+   Global Styles — Layout, header, button, UI
+   ============================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.3s ease;
+}
+
+/* ---- Wheel container ---- */
+
+.wheel-container {
+  position: fixed;
+  bottom: -22vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200vw;
+  height: 200vw;
+  pointer-events: none;
+}
+
+stillness-ring {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateY(50%);
+  --ring-size: 100vh;
+}
+
+/* ---- Header ---- */
+
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 2rem 1rem 1rem;
+  text-align: center;
+  z-index: 10;
+  transition: opacity 0.8s ease;
+}
+
+.header.dimmed {
+  opacity: 0.4;
+}
+
+.header h1 {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.selection {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  min-height: 1.5rem;
+}
+
+.selection span {
+  display: inline-block;
+  cursor: pointer;
+  padding: 0.25rem 0.1rem;
+  transition: opacity 0.2s;
+}
+
+.selection span:active {
+  opacity: 0.5;
+}
+
+.selection .sep {
+  margin: 0 0.4rem;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.selection .sep:active {
+  opacity: 1;
+}
+
+/* ---- Timer ---- */
+
+.timer {
+  font-size: 3rem;
+  font-weight: 200;
+  color: var(--text-primary);
+  margin-top: 1rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.timer.visible {
+  opacity: 1;
+}
+
+/* ---- Button ---- */
+
+.btn {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px solid var(--ring-track-color);
+  background: var(--btn-bg);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.btn.playing {
+  background: var(--btn-playing-bg);
+  color: var(--btn-playing-color);
+  opacity: 0.6;
+}
+
+.btn.breathing {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.btn.paused {
+  opacity: 0.8;
+  animation: none;
+}
+
+@keyframes breathe {
+  0%, 100% {
+    opacity: 0.5;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateX(-50%) scale(1.03);
+  }
+}
+
+.btn.pressing {
+  transform: translateX(-50%) scale(0.9);
+  transition: transform 0.5s ease;
+}
+
+/* ---- Hint ---- */
+
+.hint {
+  position: fixed;
+  bottom: 7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.5rem;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  z-index: 10;
+  transition: opacity 0.3s;
+}
+
+.hint.hidden {
+  opacity: 0;
+}
+
+/* ---- Theme toggle ---- */
+
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  z-index: 10;
+  padding: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.theme-toggle:hover {
+  opacity: 0.8;
+}
+
+.theme-toggle.dimmed {
+  opacity: 0.2;
+}
+
+.theme-toggle svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--text-muted);
+  transition: fill 0.3s;
+}
+
+.theme-toggle .sun { display: none; }
+.theme-toggle .moon { display: block; }
+
+:root.dark .theme-toggle .sun { display: block; }
+:root.dark .theme-toggle .moon { display: none; }
