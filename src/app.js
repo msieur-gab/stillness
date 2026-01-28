@@ -17,7 +17,7 @@ import {
   loadAmbiance, startAmbiance, stopAmbiance,
   suspendAudio, resumeAudio,
   fadeAmbiance, primeChime, playChime,
-  updateMediaMetadata,
+  updateMediaMetadata, setupMediaActions,
 } from './services/audio-service.js';
 import { triggerHaptic } from './services/haptic-service.js';
 import { storage } from './services/storage-service.js';
@@ -322,6 +322,13 @@ if (storage.isDark) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
 }
+
+// ---- Media Session Actions ----
+
+setupMediaActions(
+  () => session.resume(),
+  () => session.pause()
+);
 
 // ---- Boot ----
 

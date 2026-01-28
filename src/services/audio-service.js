@@ -34,6 +34,13 @@ export function updateMediaMetadata(modeLabel, ambianceLabel) {
   }
 }
 
+export function setupMediaActions(onPlay, onPause) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', onPlay);
+    navigator.mediaSession.setActionHandler('pause', onPause);
+  }
+}
+
 // ---- Init (unlocks AudioContext on user gesture) ----
 
 export function initAudio() {
