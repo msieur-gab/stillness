@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Stillness Meditation</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#e8e8e8">
+  <meta name="description" content="Minimalist meditation timer with ambient soundscapes">
+  <!-- iOS PWA -->
+  <link rel="apple-touch-icon" href="./yoga_15876064.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Stillness">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="format-detection" content="telephone=no">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ---- Theme custom properties ---- */
+    body {
+      --bg: #e8e8e8;
+      --bg-surface: #f0f0f0;
+      --text-primary: #1a1a1a;
+      --text-secondary: #4a4a4a;
+      --text-muted: #888888;
+      --ring-track: rgba(0, 0, 0, 0.06);
+      --ring-track-faded: rgba(0, 0, 0, 0.025);
+      --accent: #2a2a2a;
+      --wheel-offset: 22vh;
+      --ring-active-radius: 50vh;
+      --ring-expansion: 22vh;
+      background: var(--bg);
+      color: var(--text-primary);
+      transition: background 0.6s ease, color 0.6s ease;
+    }
+
+    body.dark {
+      --bg: #1a1a1a;
+      --bg-surface: #2a2a2a;
+      --text-primary: #e8e8e8;
+      --text-secondary: #b0b0b0;
+      --text-muted: #777777;
+      --ring-track: rgba(255, 255, 255, 0.08);
+      --ring-track-faded: rgba(255, 255, 255, 0.03);
+      --accent: #e0e0e0;
+    }
+
+    /* ---- Dimmer ---- */
+    .dimmer {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0);
+      transition: background 2s ease;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .dimmer.active {
+      background: rgba(0, 0, 0, 0.7);
+    }
+
+    /* ---- Header ---- */
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 2.5rem 1.5rem 1rem;
+      text-align: center;
+      z-index: 20;
+      transition: opacity 0.5s ease;
+    }
+
+    .header.dimmed {
+      opacity: 0;
+    }
+
+    .header-title {
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .header-selection {
+      font-size: 1.1rem;
+      font-weight: 400;
+      color: var(--text-primary);
+      min-height: 1.5rem;
+    }
+
+    .header-selection .separator {
+      color: var(--text-muted);
+      margin: 0 0.4rem;
+    }
+
+    /* ---- Back button ---- */
+    .back-button {
+      position: fixed;
+      top: 0.8rem;
+      left: 0.8rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 0.5rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease, color 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      z-index: 30;
+      font-family: inherit;
+    }
+
+    .back-button.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .back-button:hover {
+      color: var(--text-primary);
+    }
+
+    /* ---- Theme toggle ---- */
+    .theme-toggle {
+      position: fixed;
+      top: 0.8rem;
+      right: 0.8rem;
+      background: none;
+      border: 1px solid var(--text-muted);
+      border-radius: 50%;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.4rem;
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      transition: opacity 0.4s ease, color 0.3s ease, border-color 0.3s ease;
+      -webkit-tap-highlight-color: transparent;
+      font-family: inherit;
+    }
+
+    .theme-toggle:hover {
+      color: var(--text-primary);
+      border-color: var(--text-primary);
+    }
+
+    .theme-toggle.dimmed {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .theme-toggle svg {
+      width: 1rem;
+      height: 1rem;
+      display: block;
+    }
+
+    /* ---- Wheel container ---- */
+    .wheel {
+      position: fixed;
+      bottom: calc(-1 * var(--wheel-offset, 22vh));
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200vw;
+      height: 200vw;
+      pointer-events: none;
+    }
+
+    /* ---- Hint ---- */
+    .hint {
+      position: fixed;
+      bottom: 7rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.55rem;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+      opacity: 0.5;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+    }
+
+    .hint.hidden {
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Dimmer overlay -->
+  <div class="dimmer"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">Stillness</div>
+    <div class="header-selection"></div>
+  </div>
+
+  <!-- Back button -->
+  <button class="back-button"><span>&larr;</span> Back</button>
+
+  <!-- Dark mode toggle -->
+  <button class="theme-toggle" aria-label="Toggle dark mode">
+    <svg viewBox="0 0 24 24" aria-hidden="true"></svg>
+  </button>
+
+  <!-- Wheel (three rings) -->
+  <div class="wheel">
+    <stillness-ring id="ring1"></stillness-ring>
+    <stillness-ring id="ring2"></stillness-ring>
+    <stillness-ring id="ring3"></stillness-ring>
+  </div>
+
+  <!-- Center button -->
+  <stillness-center></stillness-center>
+
+  <!-- Hint -->
+  <div class="hint">Select mode</div>
+
+  <script type="module" src="./js/app.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (isSecure) {
+          navigator.serviceWorker.register('sw.js').catch(err => {
+            console.log('ServiceWorker registration failed:', err);
+          });
+        }
+      });
+    }
+  </script>
+</body>
+</html>
