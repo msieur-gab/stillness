@@ -222,3 +222,106 @@ stillness-ring {
 
 :root.dark .theme-toggle .sun { display: block; }
 :root.dark .theme-toggle .moon { display: none; }
+
+/* ---- Update Toast ---- */
+
+.update-toast {
+  position: fixed;
+  bottom: 7.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary, #333);
+  color: var(--bg, #fff);
+  padding: 0.6rem 0.8rem 0.6rem 1rem;
+  border-radius: 2rem;
+  font-size: 0.65rem;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.update-toast .update-btn {
+  background: var(--bg, #fff);
+  color: var(--text-primary, #333);
+  border: none;
+  border-radius: 1rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.update-toast .dismiss-btn {
+  background: none;
+  border: none;
+  color: var(--bg, #fff);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  opacity: 0.6;
+}
+
+.update-toast .dismiss-btn:hover {
+  opacity: 1;
+}
+
+/* ---- Install Button ---- */
+
+.install-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--text-primary, #333);
+  color: var(--bg, #fff);
+  border: none;
+  border-radius: 1.5rem;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0;
+  transform: translateY(-0.5rem);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.install-btn.visible {
+  opacity: 0.8;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.install-btn:hover {
+  opacity: 1;
+}
+
+.install-btn:active {
+  transform: scale(0.95);
+}
+
+.install-btn svg {
+  flex-shrink: 0;
+}

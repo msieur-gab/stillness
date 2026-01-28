@@ -1,20 +1,17 @@
 // ==============================
-// Audio Service — Web Audio API
-// Tick feedback, gapless ambiance looping,
-// chime playback, fade-out for sleeping mode
+// Audio Service
+// Uses HTML Audio for ambiance (enables Media Session on Android)
+// Web Audio API for tick feedback only
 // ==============================
 
 let ctx = null;
-let gainNode = null;
-let sourceNode = null;
-let ambianceBuffer = null;
+let ambianceAudio = null;
 let chimeAudio = null;
+let fadeInterval = null;
 
 function ensureContext() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    gainNode = ctx.createGain();
-    gainNode.connect(ctx.destination);
   }
   return ctx;
 }
@@ -31,6 +28,7 @@ export function updateMediaMetadata(modeLabel, ambianceLabel) {
         { src: './yoga_15876064.png', sizes: '512x512', type: 'image/png' }
       ]
     });
+    navigator.mediaSession.playbackState = 'playing';
   }
 }
 
@@ -41,13 +39,19 @@ export function setupMediaActions(onPlay, onPause) {
   }
 }
 
+export function setMediaPlaybackState(state) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = state; // 'playing', 'paused', 'none'
+  }
+}
+
 // ---- Init (unlocks AudioContext on user gesture) ----
 
 export function initAudio() {
   ensureContext();
 }
 
-// ---- Tick (rotation feedback) ----
+// ---- Tick (rotation feedback via Web Audio) ----
 
 export function playTick() {
   if (!ctx) return;
@@ -63,51 +67,81 @@ export function playTick() {
   osc.stop(ctx.currentTime + 0.05);
 }
 
-// ---- Ambiance (gapless Web Audio loop) ----
+// ---- Ambiance (HTML Audio for Media Session support) ----
 
 export async function loadAmbiance(url) {
-  const c = ensureContext();
-  if (c.state === 'suspended') await c.resume();
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-  ambianceBuffer = await c.decodeAudioData(arrayBuffer);
+  stopAmbiance();
+  ambianceAudio = new Audio(url);
+  ambianceAudio.loop = true;
+  ambianceAudio.preload = 'auto';
+  ambianceAudio.volume = 1;
+
+  return new Promise((resolve, reject) => {
+    ambianceAudio.addEventListener('canplaythrough', resolve, { once: true });
+    ambianceAudio.addEventListener('error', reject, { once: true });
+    ambianceAudio.load();
+  });
 }
 
 export function startAmbiance() {
-  if (!ambianceBuffer || !ctx) return;
-  stopAmbiance();
-  gainNode.gain.setValueAtTime(1, ctx.currentTime);
-  sourceNode = ctx.createBufferSource();
-  sourceNode.buffer = ambianceBuffer;
-  sourceNode.loop = true;
-  sourceNode.connect(gainNode);
-  sourceNode.start(0);
+  if (!ambianceAudio) return;
+  ambianceAudio.volume = 1;
+  ambianceAudio.play().catch(() => {});
 }
 
 export function stopAmbiance() {
-  if (sourceNode) {
-    try { sourceNode.stop(); } catch (_) {}
-    sourceNode.disconnect();
-    sourceNode = null;
+  if (fadeInterval) {
+    clearInterval(fadeInterval);
+    fadeInterval = null;
   }
+  if (ambianceAudio) {
+    ambianceAudio.pause();
+    ambianceAudio.currentTime = 0;
+    ambianceAudio = null;
+  }
+  setMediaPlaybackState('none');
 }
 
 // ---- Pause / Resume ----
 
 export async function suspendAudio() {
+  if (ambianceAudio) {
+    ambianceAudio.pause();
+  }
   if (ctx && ctx.state === 'running') await ctx.suspend();
+  setMediaPlaybackState('paused');
 }
 
 export async function resumeAudio() {
   if (ctx && ctx.state === 'suspended') await ctx.resume();
+  if (ambianceAudio) {
+    ambianceAudio.play().catch(() => {});
+  }
+  setMediaPlaybackState('playing');
 }
 
 // ---- Fade (sleeping mode ending) ----
 
 export function fadeAmbiance(durationSeconds) {
-  if (!ctx || !gainNode) return;
-  gainNode.gain.setValueAtTime(gainNode.gain.value, ctx.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + durationSeconds);
+  if (!ambianceAudio) return;
+
+  const startVolume = ambianceAudio.volume;
+  const steps = durationSeconds * 10; // 10 steps per second
+  const volumeStep = startVolume / steps;
+  let currentStep = 0;
+
+  if (fadeInterval) clearInterval(fadeInterval);
+
+  fadeInterval = setInterval(() => {
+    currentStep++;
+    const newVolume = Math.max(0, startVolume - (volumeStep * currentStep));
+    ambianceAudio.volume = newVolume;
+
+    if (currentStep >= steps) {
+      clearInterval(fadeInterval);
+      fadeInterval = null;
+    }
+  }, 100);
 }
 
 // ---- Chime (relaxing mode ending) ----

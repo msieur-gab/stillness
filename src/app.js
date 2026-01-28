@@ -17,7 +17,7 @@ import {
   loadAmbiance, startAmbiance, stopAmbiance,
   suspendAudio, resumeAudio,
   fadeAmbiance, primeChime, playChime,
-  updateMediaMetadata, setupMediaActions,
+  updateMediaMetadata, setupMediaActions, setMediaPlaybackState,
 } from './services/audio-service.js';
 import { triggerHaptic } from './services/haptic-service.js';
 import { storage } from './services/storage-service.js';
@@ -317,38 +317,112 @@ if (storage.isDark) {
   document.documentElement.classList.add('dark');
 }
 
-// ---- Service Worker ----
+// ---- Service Worker & Updates ----
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Check for updates periodically (every 60 seconds when active)
+      setInterval(() => reg.update(), 60000);
+
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New version available! 
             showUpdatePrompt();
           }
         });
       });
-    });
+    }).catch(err => console.warn('SW registration failed:', err));
+  });
+
+  // Handle controller change (new SW activated)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // Only reload if we're not currently in a session
+    if (session.state === 'selecting' || session.state === 'idle') {
+      window.location.reload();
+    }
   });
 }
 
 function showUpdatePrompt() {
-  const msg = 'A new version is available.';
+  // Don't show if already showing
+  if (document.querySelector('.update-toast')) return;
+
   const toast = document.createElement('div');
-  toast.style.cssText = `
-    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
-    background: var(--text-primary); color: var(--bg);
-    padding: 0.8rem 1.2rem; border-radius: 2rem; font-size: 0.7rem;
-    z-index: 1000; display: flex; align-items: center; gap: 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  toast.className = 'update-toast';
+  toast.innerHTML = `
+    <span>New version available</span>
+    <button class="update-btn">Update</button>
+    <button class="dismiss-btn" aria-label="Dismiss">&times;</button>
   `;
-  toast.innerHTML = `<span>${msg}</span><button style="background:none; border:1px solid var(--bg); color:var(--bg); border-radius:1rem; padding:0.2rem 0.6rem; cursor:pointer; font-size:0.6rem;">Update</button>`;
-  
-  toast.querySelector('button').onclick = () => window.location.reload();
+
+  toast.querySelector('.update-btn').onclick = () => {
+    window.location.reload();
+  };
+  toast.querySelector('.dismiss-btn').onclick = () => {
+    toast.remove();
+  };
+
   document.body.appendChild(toast);
+}
+
+// ---- PWA Install Prompt ----
+
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallButton();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  hideInstallButton();
+});
+
+function showInstallButton() {
+  // Don't show if already installed (standalone mode)
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  if (navigator.standalone === true) return; // iOS
+
+  let installBtn = document.getElementById('installBtn');
+  if (!installBtn) {
+    installBtn = document.createElement('button');
+    installBtn.id = 'installBtn';
+    installBtn.className = 'install-btn';
+    installBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Install
+    `;
+    installBtn.onclick = promptInstall;
+    document.body.appendChild(installBtn);
+  }
+  installBtn.classList.add('visible');
+}
+
+function hideInstallButton() {
+  const installBtn = document.getElementById('installBtn');
+  if (installBtn) {
+    installBtn.classList.remove('visible');
+  }
+}
+
+async function promptInstall() {
+  if (!deferredInstallPrompt) return;
+
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+
+  if (outcome === 'accepted') {
+    hideInstallButton();
+  }
+  deferredInstallPrompt = null;
 }
 
 // ---- Media Session Actions ----
