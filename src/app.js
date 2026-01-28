@@ -17,6 +17,7 @@ import {
   loadAmbiance, startAmbiance, stopAmbiance,
   suspendAudio, resumeAudio,
   fadeAmbiance, primeChime, playChime,
+  updateMediaMetadata,
 } from './services/audio-service.js';
 import { triggerHaptic } from './services/haptic-service.js';
 import { storage } from './services/storage-service.js';
@@ -124,6 +125,8 @@ function onEnterPlaying(from) {
     if (session.mode.id === 'relaxing') primeChime();
 
     const amb = session.ambiance;
+    updateMediaMetadata(session.mode.label, amb ? amb.label : 'Silence');
+
     if (amb && amb.file) {
       loadAmbiance(`./sounds/${amb.file}`).then(() => startAmbiance());
     }
@@ -259,7 +262,6 @@ function setupHeaderTaps() {
         // Pause and jump to that level for editing
         timer.stop();
         stopAmbiance();
-        releaseWakeLock();
 
         btn.classList.remove('playing', 'breathing', 'paused');
         timerEl.classList.remove('visible');

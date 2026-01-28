@@ -19,6 +19,21 @@ function ensureContext() {
   return ctx;
 }
 
+// ---- Media Session ----
+
+export function updateMediaMetadata(modeLabel, ambianceLabel) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: `${modeLabel} Meditation`,
+      artist: 'Stillness',
+      album: ambianceLabel || 'Silence',
+      artwork: [
+        { src: './yoga_15876064.png', sizes: '512x512', type: 'image/png' }
+      ]
+    });
+  }
+}
+
 // ---- Init (unlocks AudioContext on user gesture) ----
 
 export function initAudio() {
