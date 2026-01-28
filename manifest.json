@@ -2,6 +2,7 @@
   "name": "Stillness Meditation",
   "short_name": "Stillness",
   "start_url": "./index.html",
+  "display_override": ["fullscreen", "minimal-ui"],
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#e8e8e8",
