@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stillness-v15';
+const CACHE_NAME = 'stillness-v17';
 
 const LOCAL_ASSETS = [
   './',
@@ -17,21 +17,24 @@ const LOCAL_ASSETS = [
   './src/utils/constants.js',
   './src/utils/format.js',
   './src/utils/gesture.js',
-  // Sounds
+  // Sounds - shared
   './sounds/chime.mp3',
-  './sounds/birds.mp3',
-  './sounds/forest.mp3',
   './sounds/rain.mp3',
-  './sounds/river.mp3',
-  './sounds/cricket.mp3',
-  './sounds/fireplace.mp3',
-  './sounds/sea-wave-34088.mp3',
+  './sounds/forest.mp3',
   './sounds/soft-peaceful-piano-melody-309269.mp3',
-  './sounds/wind-chimes-no-background-noise-57238.mp3',
-  './sounds/thunderstorm-108454.mp3',
   './sounds/binaural-beats_delta_440_440-5hz-48565.mp3',
   './sounds/uplifting-pad-texture-113842.mp3',
   './sounds/beach-waves-binaural-72494.mp3',
+  // Sounds - Focusing
+  './sounds/handpan-dream-olistik-sound-project-patrizio-yoga-137080.mp3',
+  // Sounds - Meditating
+  './sounds/river.mp3',
+  './sounds/sea-wave-34088.mp3',
+  './sounds/wind-chimes-no-background-noise-57238.mp3',
+  // Sounds - Sleeping
+  './sounds/cricket.mp3',
+  './sounds/fireplace.mp3',
+  './sounds/thunderstorm-108454.mp3',
 ];
 
 self.addEventListener('install', (event) => {

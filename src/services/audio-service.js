@@ -120,7 +120,7 @@ export async function resumeAudio() {
   setMediaPlaybackState('playing');
 }
 
-// ---- Fade (sleeping mode ending) ----
+// ---- Fade (Sleeping mode ending) ----
 
 export function fadeAmbiance(durationSeconds) {
   if (!ambianceAudio) return;
@@ -144,7 +144,7 @@ export function fadeAmbiance(durationSeconds) {
   }, 100);
 }
 
-// ---- Chime (relaxing mode ending) ----
+// ---- Chime (Focusing & Meditating mode ending) ----
 
 export function primeChime() {
   if (!chimeAudio) {

@@ -122,7 +122,8 @@ function onEnterPlaying(from) {
 
     // Audio
     initAudio();
-    if (session.mode.id === 'relaxing') primeChime();
+    // Focusing and Meditating both end with a chime
+    if (session.mode.id !== 'sleeping') primeChime();
 
     const amb = session.ambiance;
     updateMediaMetadata(session.mode.label, amb ? amb.label : 'Silence');
@@ -158,18 +159,18 @@ function onComplete() {
   timer.stop();
   timerEl.textContent = formatTime(0);
 
-  if (session.mode.id === 'relaxing') {
-    // Chime ending
-    stopAmbiance();
-    playChime();
-    setTimeout(() => session.reset(), 5000);
-  } else {
-    // Sleeping: fade audio over 10s, then reset
+  if (session.mode.id === 'sleeping') {
+    // Sleeping: fade audio over 10s, then reset silently
     fadeAmbiance(10);
     setTimeout(() => {
       stopAmbiance();
       session.reset();
     }, 10000);
+  } else {
+    // Focusing & Meditating: chime ending
+    stopAmbiance();
+    playChime();
+    setTimeout(() => session.reset(), 5000);
   }
 }
 
