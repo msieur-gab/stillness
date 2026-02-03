@@ -42,6 +42,7 @@ const selectionEl = document.getElementById('selection');
 const timerEl = document.getElementById('timer');
 const hintEl = document.getElementById('hint');
 const headerEl = document.getElementById('header');
+const titleEl = document.getElementById('title');
 const themeToggle = document.getElementById('themeToggle');
 
 // ---- Feed data into rings ----
@@ -255,6 +256,31 @@ onSwipeUp({
   },
 });
 
+// ---- Title long-press → recalibrate ----
+
+onLongPress(titleEl, {
+  onTap() {
+    // Do nothing on tap
+  },
+  onLongPress() {
+    // Only allow recalibration when not in session
+    if (session.state === 'playing' || session.state === 'paused') return;
+
+    // Haptic confirmation
+    triggerHaptic('confirm');
+
+    // Clear existing config and show onboarding
+    onboarding.clearConfig();
+
+    const onboardingEl = document.createElement('stillness-onboarding');
+    onboardingEl.addEventListener('complete', () => {
+      // Recalculate ring positions with new layout
+      rings.forEach(r => r.recalculate());
+    });
+    document.body.appendChild(onboardingEl);
+  },
+});
+
 // ---- Header tap → jump to level ----
 
 function setupHeaderTaps() {
@@ -348,9 +374,21 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+let pendingUpdate = false;
+
+function isOnboardingActive() {
+  return document.querySelector('stillness-onboarding') !== null;
+}
+
 function showUpdatePrompt() {
   // Don't show if already showing
   if (document.querySelector('.update-toast')) return;
+
+  // Defer showing until onboarding completes
+  if (isOnboardingActive()) {
+    pendingUpdate = true;
+    return;
+  }
 
   const toast = document.createElement('div');
   toast.className = 'update-toast';
@@ -377,7 +415,10 @@ let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  showInstallButton();
+  // Defer showing until onboarding completes
+  if (!isOnboardingActive()) {
+    showInstallButton();
+  }
 });
 
 window.addEventListener('appinstalled', () => {
@@ -451,6 +492,9 @@ if (onboarding.hasConfig()) {
   const onboardingEl = document.createElement('stillness-onboarding');
   onboardingEl.addEventListener('complete', () => {
     startApp();
+    // Show any pending prompts that were deferred during onboarding
+    if (deferredInstallPrompt) showInstallButton();
+    if (pendingUpdate) showUpdatePrompt();
   });
   document.body.appendChild(onboardingEl);
 }
