@@ -415,10 +415,7 @@ let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  // Defer showing until onboarding completes
-  if (!isOnboardingActive()) {
-    showInstallButton();
-  }
+  showInstallButton();
 });
 
 window.addEventListener('appinstalled', () => {
@@ -492,8 +489,7 @@ if (onboarding.hasConfig()) {
   const onboardingEl = document.createElement('stillness-onboarding');
   onboardingEl.addEventListener('complete', () => {
     startApp();
-    // Show any pending prompts that were deferred during onboarding
-    if (deferredInstallPrompt) showInstallButton();
+    // Show any pending update prompt that was deferred during onboarding
     if (pendingUpdate) showUpdatePrompt();
   });
   document.body.appendChild(onboardingEl);
